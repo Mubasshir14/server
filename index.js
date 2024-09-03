@@ -9,8 +9,10 @@ const port = process.env.PORT || 5000;
 
 // Update CORS configuration
 app.use(cors({
-  origin: 'https://your-frontend-url.onrender.com',
-  credentials: true
+    origin: ['https://your-frontend-url.onrender.com', 'http://localhost:5173'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
 }));
 app.use(express.json());
 
@@ -285,7 +287,7 @@ async function run() {
             try {
                 // Delete the order with the specified transaction ID
                 const result = await orderCollection.deleteOne({ transectionId: req.params.tranId });
-        
+
                 // If the deletion is successful, redirect to the fail page with the transaction ID
                 if (result.deletedCount > 0) {
                     res.redirect(`https://your-frontend-url.onrender.com/payment/fail/${req.params.tranId}`);
