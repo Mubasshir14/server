@@ -7,7 +7,11 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
 
-app.use(cors());
+// Update CORS configuration
+app.use(cors({
+  origin: 'https://your-frontend-url.onrender.com',
+  credentials: true
+}));
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.3aom8f0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -20,10 +24,9 @@ const client = new MongoClient(uri, {
     }
 });
 
-
 const store_id = process.env.STORE_ID;
 const store_passwd = process.env.STORE_PASS;
-const is_live = true //true for live, false for sandbox
+const is_live = true; // true for live, false for sandbox
 
 async function run() {
     try {
@@ -92,14 +95,7 @@ async function run() {
             }
         });
 
-        // // delete 
-        // app.delete('product/:id', async (req, res) => {
-        //     const id = req.params.id;
-        //     const query = { _id: new ObjectId(id) };
-        //     const result = await productCollection.deleteOne(query);
-        //     res.send(result);
-        // })
-        // delete product by id
+        // Delete product by id
         app.delete('/product/:id', async (req, res) => {
             const id = req.params.id;
 
@@ -118,7 +114,7 @@ async function run() {
             }
         });
 
-        // update product
+        // Update product
         app.patch('/product/:id', async (req, res) => {
             try {
                 const id = req.params.id;
@@ -137,7 +133,6 @@ async function run() {
                 res.status(500).send({ message: 'Internal Server Error' });
             }
         });
-
 
         // Add a new user
         app.post('/users', async (req, res) => {
@@ -181,9 +176,7 @@ async function run() {
             res.send(result);
         });
 
-
-        // const tran_id = new ObjectId().toString()
-        // payment---------------------------------
+        // Payment
         app.post('/order', async (req, res) => {
             const { email, name, address, postcode, currency } = req.body;
 
@@ -219,9 +212,9 @@ async function run() {
                     currency: currency,
                     tran_id: tran_id,
                     success_url: `https://gadget-home-server2.onrender.com/success/${tran_id}`,
-                    fail_url: `https://gadget-home-server2.onrender.com/payment/fail/${tran_id}`,
-                    cancel_url: 'http://localhost:3030/cancel',
-                    ipn_url: 'http://localhost:3030/ipn',
+                    fail_url: `https://gadget-home-server2.onrender.com/fail/${tran_id}`,
+                    cancel_url: 'https://gadget-home-server2.onrender.com/cancel',
+                    ipn_url: 'https://gadget-home-server2.onrender.com/ipn',
                     shipping_method: 'Courier',
                     product_name: 'Cart Items',
                     product_category: 'Electronic',
@@ -271,7 +264,7 @@ async function run() {
             }
         });
 
-        app.post('/payment/success/:tranID', async (req, res) => {
+        app.post('/success/:tranID', async (req, res) => {
             const { tranID } = req.params;
 
             const result = await orderCollection.updateOne(
@@ -279,7 +272,7 @@ async function run() {
                 { $set: { paidStatus: true } }
             );
             if (result.modifiedCount > 0) {
-                res.redirect(`http://localhost:5173/payment/success/${tranID}`);
+                res.redirect(`https://your-frontend-url.onrender.com/payment/success/${tranID}`);
             }
         });
 
@@ -288,15 +281,14 @@ async function run() {
             res.send(result);
         });
 
-
-        app.post('/payment/fail/:tranId', async (req, res) => {
+        app.post('/fail/:tranId', async (req, res) => {
             try {
                 // Delete the order with the specified transaction ID
                 const result = await orderCollection.deleteOne({ transectionId: req.params.tranId });
         
                 // If the deletion is successful, redirect to the fail page with the transaction ID
                 if (result.deletedCount > 0) {
-                    res.redirect(`http://localhost:5173/payment/fail/${req.params.tranId}`);
+                    res.redirect(`https://your-frontend-url.onrender.com/payment/fail/${req.params.tranId}`);
                 } else {
                     // Handle the case where the order was not found
                     res.status(404).send('Order not found');
@@ -306,37 +298,6 @@ async function run() {
                 res.status(500).send('Internal Server Error');
             }
         });
-        
-
-
-
-       
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
