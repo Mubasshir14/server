@@ -23,7 +23,7 @@ const client = new MongoClient(uri, {
 
 const store_id = process.env.STORE_ID;
 const store_passwd = process.env.STORE_PASS;
-const is_live = true //true for live, false for sandbox
+const is_live = false //true for live, false for sandbox
 
 async function run() {
     try {
