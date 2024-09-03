@@ -23,7 +23,7 @@ const client = new MongoClient(uri, {
 
 const store_id = process.env.STORE_ID;
 const store_passwd = process.env.STORE_PASS;
-const is_live = false //true for live, false for sandbox
+const is_live = true //true for live, false for sandbox
 
 async function run() {
     try {
@@ -218,8 +218,8 @@ async function run() {
                     total_amount: totalAmount,
                     currency: currency,
                     tran_id: tran_id,
-                    success_url: `http://localhost:5000/payment/success/${tran_id}`,
-                    fail_url: `http://localhost:5000/payment/fail/${tran_id}`,
+                    success_url: `https://gadget-home-server2.onrender.com/success/${tran_id}`,
+                    fail_url: `https://gadget-home-server2.onrender.com/payment/fail/${tran_id}`,
                     cancel_url: 'http://localhost:3030/cancel',
                     ipn_url: 'http://localhost:3030/ipn',
                     shipping_method: 'Courier',
