@@ -2,22 +2,21 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const SSLCommerzPayment = require('sslcommerz-lts');
+const SSLCommerzPayment = require('sslcommerz-lts')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Update CORS configuration to allow multiple origins
-app.use(cors({
-    origin: ['https://gadget-home-c03d3.web.app', 'http://localhost:5173','http://localhost:5174'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
-}));
-
+app.use(
+    cors({
+      origin: ["http://localhost:5173", "https://gadget-home-c03d3.web.app"],
+      credentials: true,
+    })
+  );
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.3aom8f0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+
 const client = new MongoClient(uri, {
     serverApi: {
         version: ServerApiVersion.v1,
@@ -26,14 +25,14 @@ const client = new MongoClient(uri, {
     }
 });
 
+
 const store_id = process.env.STORE_ID;
 const store_passwd = process.env.STORE_PASS;
-const is_live = true; // true for live, false for sandbox
+const is_live = true //true for live, false for sandbox
 
 async function run() {
     try {
         await client.connect();
-        console.log("Connected to MongoDB!");
 
         const userCollection = client.db('gadgetDB').collection('users');
         const productCollection = client.db('gadgetDB').collection('products');
@@ -41,7 +40,7 @@ async function run() {
         const cartCollection = client.db('gadgetDB').collection('carts');
 
         // Generate JWT Token
-        app.post('/jwt', (req, res) => {
+        app.post('/jwt', async (req, res) => {
             const user = req.body;
             const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
                 expiresIn: '24h'
@@ -65,72 +64,87 @@ async function run() {
             });
         };
 
-        // Product Routes
-        app.route('/product')
-            .get(async (req, res) => {
-                const result = await productCollection.find().toArray();
-                res.send(result);
-            })
-            .post(async (req, res) => {
-                const productItem = req.body;
-                const result = await productCollection.insertOne(productItem);
-                res.send(result);
-            });
+        // Get all products
+        app.get('/product', async (req, res) => {
+            const result = await productCollection.find().toArray();
+            res.send(result);
+        });
 
-        app.route('/product/:id')
-            .get(async (req, res) => {
-                const id = req.params.id;
-                try {
-                    if (ObjectId.isValid(id)) {
-                        const query = { _id: new ObjectId(id) };
-                        const result = await productCollection.findOne(query);
-                        if (result) {
-                            res.send(result);
-                        } else {
-                            res.status(404).send({ error: 'Product not found' });
-                        }
-                    } else {
-                        res.status(400).send({ error: 'Invalid ID format' });
-                    }
-                } catch (error) {
-                    res.status(500).send({ error: 'Internal Server Error' });
-                }
-            })
-            .delete(async (req, res) => {
-                const id = req.params.id;
-                try {
+        // Add a new product
+        app.post('/product', async (req, res) => {
+            const productItem = req.body;
+            const result = await productCollection.insertOne(productItem);
+            res.send(result);
+        });
+
+        // Get a specific product by ID
+        app.get('/product/:id', async (req, res) => {
+            const id = req.params.id;
+            try {
+                if (ObjectId.isValid(id)) {
                     const query = { _id: new ObjectId(id) };
-                    const result = await productCollection.deleteOne(query);
-
-                    if (result.deletedCount === 1) {
-                        res.status(200).json({ message: 'Product deleted successfully.' });
+                    const result = await productCollection.findOne(query);
+                    if (result) {
+                        res.send(result);
                     } else {
-                        res.status(404).json({ message: 'Product not found.' });
+                        res.status(404).send({ error: 'Product not found' });
                     }
-                } catch (error) {
-                    console.error('Error deleting product:', error);
-                    res.status(500).json({ message: 'Internal server error.' });
+                } else {
+                    res.status(400).send({ error: 'Invalid ID format' });
                 }
-            })
-            .patch(async (req, res) => {
-                try {
-                    const id = req.params.id;
-                    const updates = req.body;
-                    const query = { _id: new ObjectId(id) };
+            } catch (error) {
+                res.status(500).send({ error: 'Internal Server Error' });
+            }
+        });
 
-                    const result = await productCollection.updateOne(query, { $set: updates });
+        // // delete 
+        // app.delete('product/:id', async (req, res) => {
+        //     const id = req.params.id;
+        //     const query = { _id: new ObjectId(id) };
+        //     const result = await productCollection.deleteOne(query);
+        //     res.send(result);
+        // })
+        // delete product by id
+        app.delete('/product/:id', async (req, res) => {
+            const id = req.params.id;
 
-                    if (result.matchedCount === 0) {
-                        return res.status(404).send({ message: 'Product not found' });
-                    }
-                    res.send(result);
-                } catch (error) {
-                    console.error("Error updating product:", error);
-                    res.status(500).send({ message: 'Internal Server Error' });
+            try {
+                const query = { _id: new ObjectId(id) };
+                const result = await productCollection.deleteOne(query);
+
+                if (result.deletedCount === 1) {
+                    res.status(200).json({ message: 'Product deleted successfully.' });
+                } else {
+                    res.status(404).json({ message: 'Product not found.' });
                 }
-            });
+            } catch (error) {
+                console.error('Error deleting product:', error);
+                res.status(500).json({ message: 'Internal server error.' });
+            }
+        });
 
-        // User Routes
+        // update product
+        app.patch('/product/:id', async (req, res) => {
+            try {
+                const id = req.params.id;
+                const updates = req.body;
+                const query = { _id: new ObjectId(id) };
+
+                // Update the product in the database
+                const result = await productCollection.updateOne(query, { $set: updates });
+
+                if (result.matchedCount === 0) {
+                    return res.status(404).send({ message: 'Product not found' });
+                }
+                res.send(result);
+            } catch (error) {
+                console.error("Error updating product:", error);
+                res.status(500).send({ message: 'Internal Server Error' });
+            }
+        });
+
+
+        // Add a new user
         app.post('/users', async (req, res) => {
             const user = req.body;
             const query = { email: user.email };
@@ -143,25 +157,28 @@ async function run() {
             res.send(result);
         });
 
+        // Get all users
         app.get('/users', async (req, res) => {
             const result = await userCollection.find().toArray();
             res.send(result);
         });
 
-        // Cart Routes
-        app.route('/carts')
-            .get(async (req, res) => {
-                const email = req.query.email;
-                const query = { email: email };
-                const result = await cartCollection.find(query).toArray();
-                res.send(result);
-            })
-            .post(async (req, res) => {
-                const cartItem = req.body;
-                const result = await cartCollection.insertOne(cartItem);
-                res.send(result);
-            });
+        // Get all cart items for a specific user
+        app.get('/carts', async (req, res) => {
+            const email = req.query.email;
+            const query = { email: email };
+            const result = await cartCollection.find(query).toArray();
+            res.send(result);
+        });
 
+        // Add a new cart item
+        app.post('/carts', async (req, res) => {
+            const cartItem = req.body;
+            const result = await cartCollection.insertOne(cartItem);
+            res.send(result);
+        });
+
+        // Delete a cart item by ID
         app.delete('/carts/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
@@ -169,26 +186,34 @@ async function run() {
             res.send(result);
         });
 
-        // Payment Route
+
+        // const tran_id = new ObjectId().toString()
+        // payment---------------------------------
         app.post('/order', async (req, res) => {
             const { email, name, address, postcode, currency } = req.body;
 
             try {
+                // Fetch the user's cart items from the database
                 const cartItems = await cartCollection.find({ email }).toArray();
 
                 if (!cartItems || cartItems.length === 0) {
                     return res.status(400).send({ message: 'Cart is empty' });
                 }
 
+                // Calculate the total amount from the cart items
                 const totalAmount = parseFloat(cartItems.reduce((total, item) => {
                     const price = parseFloat(item.price);
+
+                    // Log invalid prices for debugging
                     if (isNaN(price)) {
                         console.error('Invalid price:', item);
-                        return total;
+                        return total; // Skip this item if price is invalid
                     }
+
                     return total + price;
                 }, 0));
 
+                // Check if totalAmount is NaN
                 if (isNaN(totalAmount)) {
                     return res.status(500).send({ message: 'Error calculating total amount' });
                 }
@@ -198,10 +223,10 @@ async function run() {
                     total_amount: totalAmount,
                     currency: currency,
                     tran_id: tran_id,
-                    success_url: `https://gadget-home-server2.onrender.com/success/${tran_id}`,
-                    fail_url: `https://gadget-home-server2.onrender.com/fail/${tran_id}`,
-                    cancel_url: 'https://gadget-home-server2.onrender.com/cancel',
-                    ipn_url: 'https://gadget-home-server2.onrender.com/ipn',
+                    success_url: `${process.env.SERVER_API}/payment/success/${tran_id}`,
+                    fail_url: `${process.env.SERVER_API}/payment/fail/${tran_id}`,
+                    cancel_url: '${process.env.SERVER_API}/cancel',
+                    ipn_url: '${process.env.SERVER_API}/ipn',
                     shipping_method: 'Courier',
                     product_name: 'Cart Items',
                     product_category: 'Electronic',
@@ -225,6 +250,9 @@ async function run() {
                     ship_country: 'Bangladesh',
                 };
 
+                console.log(data);
+
+                // Initialize SSLCommerz Payment
                 const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
                 const apiResponse = await sslcz.init(data);
                 const GatewayPageURL = apiResponse.GatewayPageURL;
@@ -237,44 +265,97 @@ async function run() {
                     transectionId: tran_id,
                 };
 
-                await orderCollection.insertOne(finalOrder);
+                // Await the result of the insertOne operation
+                const result = await orderCollection.insertOne(finalOrder);
+                console.log('Order inserted:', result);
+
+                console.log('Redirecting to: ', GatewayPageURL);
             } catch (error) {
                 console.error('Error processing order:', error);
                 res.status(500).json({ message: 'Internal Server Error' });
             }
         });
 
-        // Success and Failure Handlers
-        app.post('/success/:tranID', async (req, res) => {
+        app.post('/payment/success/:tranID', async (req, res) => {
             const { tranID } = req.params;
+
             const result = await orderCollection.updateOne(
                 { transectionId: tranID },
                 { $set: { paidStatus: true } }
             );
             if (result.modifiedCount > 0) {
-                res.redirect(`https://gadget-home-68119.web.app/payment/success/${tranID}`);
+                res.redirect(`http://localhost:5173/payment/success/${tranID}`);
             }
         });
 
-        app.post('/fail/:tranID', async (req, res) => {
-            const { tranID } = req.params;
-            const result = await orderCollection.deleteOne({ transectionId: tranID });
-            if (result.deletedCount > 0) {
-                res.redirect(`https://gadget-home-68119.web.app/payment/fail/${tranID}`);
+        app.get('/order', async (req, res) => {
+            const result = await orderCollection.find().toArray();
+            res.send(result);
+        });
+
+
+        app.post('/payment/fail/:tranId', async (req, res) => {
+            try {
+                // Delete the order with the specified transaction ID
+                const result = await orderCollection.deleteOne({ transectionId: req.params.tranId });
+        
+                // If the deletion is successful, redirect to the fail page with the transaction ID
+                if (result.deletedCount > 0) {
+                    res.redirect(`http://localhost:5173/payment/fail/${req.params.tranId}`);
+                } else {
+                    // Handle the case where the order was not found
+                    res.status(404).send('Order not found');
+                }
+            } catch (error) {
+                console.error('Error handling failed payment:', error);
+                res.status(500).send('Internal Server Error');
             }
         });
+        
 
-        app.get('/', (req, res) => {
-            res.send('Gadget Home is Running!');
-        });
 
-        app.listen(port, () => {
-            console.log(`Server is running on port ${port}`);
-        });
-    } catch (error) {
-        console.error("MongoDB Connection Error: ", error);
-        process.exit(1);
+
+       
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        await client.db("admin").command({ ping: 1 });
+        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    } finally {
+        // Optionally close the client connection
+        // await client.close();
     }
 }
+run().catch(console.dir);
 
-run().catch(console.error);
+app.get('/', (req, res) => {
+    res.send('Gadget Home is Running');
+});
+
+app.listen(port, () => {
+    console.log(`Gadget Home is Running on Port: ${port}`);
+});
