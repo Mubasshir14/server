@@ -8,7 +8,7 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174', 'https://gadget-home-c03d3.web.app' ],
+    origin: ['http://localhost:5173', 'http://localhost:5174', 'https://gadget-home-c03d3.web.app'],
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -295,10 +295,11 @@ async function run() {
                     total_amount: finalAmount,
                     currency: currency,
                     tran_id: tran_id,
-                    success_url: `http://localhost:5000/payment/success/${tran_id}`,
-                    fail_url: `http://localhost:5000/payment/fail/${tran_id}`,
-                    cancel_url: 'http://localhost:5000/cancel',
-                    ipn_url: 'http://localhost:5000/ipn',
+                    success_url: `https://server-6685.onrender.com/payment/success/${tran_id}`,
+                    fail_url: `https://server-6685.onrender.com/payment/fail/${tran_id}`,
+                    cancel_url: 'https://server-6685.onrender.com/cancel',
+                    ipn_url: 'https://server-6685.onrender.com/ipn',
+
                     shipping_method: 'Courier',
                     product_name: 'Cart Items',
                     product_category: 'Electronic',
