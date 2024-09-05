@@ -391,7 +391,7 @@ async function run() {
                 { $set: { paidStatus: true } }
             );
             if (result.modifiedCount > 0) {
-                res.redirect(`http://localhost:5173/payment/success/${tranID}`);
+                res.redirect(`https://gadget-home-c03d3.web.app/payment/success/${tranID}`);
             }
         });
 
@@ -408,7 +408,7 @@ async function run() {
 
                 // If the deletion is successful, redirect to the fail page with the transaction ID
                 if (result.deletedCount > 0) {
-                    res.redirect(`http://localhost:5173/payment/fail/${req.params.tranId}`);
+                    res.redirect(`https://gadget-home-c03d3.web.app/payment/fail/${req.params.tranId}`);
                 } else {
                     // Handle the case where the order was not found
                     res.status(404).send('Order not found');
