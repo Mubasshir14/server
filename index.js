@@ -7,12 +7,11 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
 
-app.use(
-    cors({
-      origin: ["http://localhost:5173", "https://gadget-home-c03d3.web.app"],
-      credentials: true,
-    })
-  );
+app.use(cors({
+    origin: ['http://localhost:5173', 'http://localhost:5174', 'https://gadget-home-c03d3.web.app' ],
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.3aom8f0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -28,7 +27,7 @@ const client = new MongoClient(uri, {
 
 const store_id = process.env.STORE_ID;
 const store_passwd = process.env.STORE_PASS;
-const is_live = true //true for live, false for sandbox
+const is_live = false //true for live, false for sandbox
 
 async function run() {
     try {
@@ -38,6 +37,7 @@ async function run() {
         const productCollection = client.db('gadgetDB').collection('products');
         const orderCollection = client.db('gadgetDB').collection('orders');
         const cartCollection = client.db('gadgetDB').collection('carts');
+        const reviewCollection = client.db('gadgetDB').collection('reviews');
 
         // Generate JWT Token
         app.post('/jwt', async (req, res) => {
@@ -63,6 +63,45 @@ async function run() {
                 next();
             });
         };
+
+        // post review
+        app.post('/reviews', async (req, res) => {
+            try {
+                const { rating, reviewText, productName, name } = req.body; // Extract productId
+                console.log('Received data:', req.body);
+
+                const newReview = {
+                    rating,
+                    reviewText,
+                    name,
+                    productName, // Include productId
+                    createdAt: new Date()
+                };
+
+                const result = await reviewCollection.insertOne(newReview);
+                res.status(201).send(result); // Send 201 status code for successful creation
+            } catch (error) {
+                console.error('Error inserting review:', error);
+                res.status(500).send({ message: 'Error inserting review', error });
+            }
+        });
+
+        // GET all reviews
+        app.get('/reviews', async (req, res) => {
+            try {
+                // Fetch all reviews from the database
+                const reviews = await reviewCollection.find({}).toArray();
+
+                res.status(200).send(reviews); // Send reviews with a 200 status code
+            } catch (error) {
+                console.error('Error fetching reviews:', error);
+                res.status(500).send({ message: 'Error fetching reviews', error });
+            }
+        });
+
+
+
+
 
         // Get all products
         app.get('/product', async (req, res) => {
@@ -105,6 +144,7 @@ async function run() {
         //     res.send(result);
         // })
         // delete product by id
+
         app.delete('/product/:id', async (req, res) => {
             const id = req.params.id;
 
@@ -185,12 +225,40 @@ async function run() {
             const result = await cartCollection.deleteOne(query);
             res.send(result);
         });
+        // Update order status by ID
+        app.put('/order/:id', async (req, res) => {
+            const id = req.params.id;
+            const updatedStatus = req.body.status;  // Expecting the status to be passed in the request body
+
+            try {
+                if (!ObjectId.isValid(id)) {
+                    return res.status(400).send({ message: 'Invalid order ID' });
+                }
+
+                const query = { _id: new ObjectId(id) };
+                const update = {
+                    $set: { status: updatedStatus } // Update the order status in the database
+                };
+
+                const result = await orderCollection.updateOne(query, update);
+
+                if (result.matchedCount === 0) {
+                    return res.status(404).send({ message: 'Order not found' });
+                }
+
+                res.send({ message: 'Order status updated successfully' });
+            } catch (error) {
+                console.error('Error updating order status:', error);
+                res.status(500).send({ message: 'Internal Server Error' });
+            }
+        });
+
 
 
         // const tran_id = new ObjectId().toString()
         // payment---------------------------------
         app.post('/order', async (req, res) => {
-            const { email, name, address, postcode, currency } = req.body;
+            const { email, name, mobile, address, upzilla, zilla, postcode, currency } = req.body;
 
             try {
                 // Fetch the user's cart items from the database
@@ -218,15 +286,19 @@ async function run() {
                     return res.status(500).send({ message: 'Error calculating total amount' });
                 }
 
+                // Additional fees (e.g., delivery fee)
+                const deliveryFee = 150; // Example fixed delivery fee
+                const finalAmount = totalAmount + deliveryFee;
+
                 const tran_id = "tran" + new Date().getTime();
                 const data = {
-                    total_amount: totalAmount,
+                    total_amount: finalAmount,
                     currency: currency,
                     tran_id: tran_id,
-                    success_url: `${process.env.SERVER_API}/payment/success/${tran_id}`,
-                    fail_url: `${process.env.SERVER_API}/payment/fail/${tran_id}`,
-                    cancel_url: '${process.env.SERVER_API}/cancel',
-                    ipn_url: '${process.env.SERVER_API}/ipn',
+                    success_url: `http://localhost:5000/payment/success/${tran_id}`,
+                    fail_url: `http://localhost:5000/payment/fail/${tran_id}`,
+                    cancel_url: 'http://localhost:5000/cancel',
+                    ipn_url: 'http://localhost:5000/ipn',
                     shipping_method: 'Courier',
                     product_name: 'Cart Items',
                     product_category: 'Electronic',
@@ -234,47 +306,81 @@ async function run() {
                     cus_name: name,
                     cus_email: email,
                     cus_add1: address,
-                    cus_add2: address,
-                    cus_city: address,
+                    cus_add2: upzilla,
+                    cus_city: zilla,
                     cus_state: address,
                     cus_postcode: postcode,
                     cus_country: 'Bangladesh',
-                    cus_phone: '01711111111',
-                    cus_fax: '01711111111',
+                    cus_phone: mobile,
+                    cus_fax: mobile,
                     ship_name: name,
                     ship_add1: address,
-                    ship_add2: address,
-                    ship_city: address,
+                    ship_add2: upzilla,
+                    ship_city: zilla,
                     ship_state: address,
                     ship_postcode: postcode,
                     ship_country: 'Bangladesh',
                 };
 
-                console.log(data);
+                console.log('Payment Data:', data);
 
                 // Initialize SSLCommerz Payment
                 const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
                 const apiResponse = await sslcz.init(data);
                 const GatewayPageURL = apiResponse.GatewayPageURL;
-                res.send({ url: GatewayPageURL });
 
+                // Insert order details into the database
                 const finalOrder = {
                     email,
                     cartItems,
                     paidStatus: false,
                     transectionId: tran_id,
+                    name,
+                    mobile,
+                    address,
+                    upzilla,
+                    zilla,
+                    postcode,
+                    currency
                 };
 
                 // Await the result of the insertOne operation
                 const result = await orderCollection.insertOne(finalOrder);
                 console.log('Order inserted:', result);
 
-                console.log('Redirecting to: ', GatewayPageURL);
+                // Send the Gateway Page URL to the client
+                res.send({ url: GatewayPageURL });
+
             } catch (error) {
                 console.error('Error processing order:', error);
                 res.status(500).json({ message: 'Internal Server Error' });
             }
         });
+
+
+
+
+        // get by tran_id
+        app.get('/order/:tran_id', async (req, res) => {
+            const tran_id = req.params.tran_id;
+
+            try {
+                // Find the order by transaction ID in the database
+                const order = await orderCollection.findOne({ transectionId: tran_id });
+
+                if (!order) {
+                    return res.status(404).send({ message: 'Order not found' });
+                }
+
+                // Return the found order
+                res.status(200).send(order);
+            } catch (error) {
+                console.error('Error fetching order:', error);
+                res.status(500).send({ message: 'Internal Server Error' });
+            }
+        });
+
+
 
         app.post('/payment/success/:tranID', async (req, res) => {
             const { tranID } = req.params;
@@ -298,7 +404,7 @@ async function run() {
             try {
                 // Delete the order with the specified transaction ID
                 const result = await orderCollection.deleteOne({ transectionId: req.params.tranId });
-        
+
                 // If the deletion is successful, redirect to the fail page with the transaction ID
                 if (result.deletedCount > 0) {
                     res.redirect(`http://localhost:5173/payment/fail/${req.params.tranId}`);
@@ -311,11 +417,11 @@ async function run() {
                 res.status(500).send('Internal Server Error');
             }
         });
-        
 
 
 
-       
+
+
 
 
 
